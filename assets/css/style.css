@@ -1,0 +1,94 @@
+/* تصميم الصفحة بشكل عام */
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #f0f0f0;  /* خلفية خفيفة */
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh; /* يتأكد من أن النموذج يظهر في المنتصف عموديًا وأفقيًا */
+}
+
+/* تنسيق النموذج (form) */
+form {
+    background-color: #ffffff;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0px 10px 25px rgba(0, 0, 0, 0.1); /* إضافة ظل للنموذج */
+    width: 100%;
+    max-width: 450px; /* عرض أكبر للنموذج */
+    box-sizing: border-box;
+}
+
+/* تنسيق العنوان داخل النموذج */
+h2 {
+    text-align: center;
+    font-size: 30px;
+    color: #333333;
+    margin-bottom: 20px;
+    font-weight: bold;
+}
+
+/* تنسيق الحقول (input) */
+input {
+    width: 100%;
+    padding: 15px;
+    margin: 15px 0;
+    border: 2px solid #ddd;
+    border-radius: 10px;
+    font-size: 16px;
+    box-sizing: border-box;
+    transition: border-color 0.3s ease;
+}
+
+/* تغيير اللون عند التفاعل مع الحقل (focus) */
+input:focus {
+    border-color: #4CAF50; /* اللون عند التركيز على الحقل */
+    outline: none; /* إزالة الإطار الافتراضي عند التركيز */
+}
+
+/* تنسيق الزر (button) */
+button {
+    width: 100%;
+    padding: 15px;
+    background-color: #4CAF50;
+    color: white;
+    font-size: 18px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+/* تغيير لون الزر عند التمرير عليه (hover) */
+button:hover {
+    background-color: #45a049;
+}
+
+/* تنسيق الرسالة عند ظهور الخطأ أو الرسالة */
+.error-message {
+    color: red;
+    font-size: 14px;
+    margin-top: 10px;
+    text-align: center;
+}
+
+/* إضافة بعض الأنماط الإضافية لتحسين الشكل العام */
+.container {
+    width: 100%;
+    padding: 30px;
+}
+
+a {
+    color: #4CAF50;
+    text-decoration: none;
+    font-size: 14px;
+    text-align: center;
+    display: block;
+    margin-top: 10px;
+}
+
+a:hover {
+    text-decoration: underline;
+}
