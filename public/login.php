@@ -1,53 +1,62 @@
 <?php
 session_start();
-include '../config/config.php';  // الاتصال بقاعدة البيانات
+include '../config/db.php';
+$error = "";
 
-// إذا كان المستخدم قد قام بتسجيل الدخول بالفعل، نوجهه مباشرة إلى لوحة التحكم المناسبة
-if (isset($_SESSION['user_id'])) {
-    if ($_SESSION['role'] == 'admin') {
-        header("Location: admin_dashboard.php"); // توجيه الإدمن إلى لوحة تحكم الإدمن
-    } else {
-        header("Location: student_dashboard.php"); // توجيه الطالب إلى لوحة تحكم الطالب
-    }
-    exit();
+function clean($data) {
+    return htmlspecialchars(trim($data));
 }
 
-// التحقق من بيانات تسجيل الدخول
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // استلام بيانات البريد الإلكتروني وكلمة المرور من النموذج
-    $email = $_POST['email'];
+    $email = clean($_POST['email']);
     $password = $_POST['password'];
 
-    // استعلام للتحقق من بيانات المستخدم
-    $sql = "SELECT * FROM User WHERE email = '$email' AND password = '$password'";
-    $result = $conn->query($sql);
-
-    if ($result->num_rows > 0) {
-        // إذا تم العثور على المستخدم
-        $user = $result->fetch_assoc();
-        $_SESSION['user_id'] = $user['personId']; // تخزين الشخص في الجلسة
-        $_SESSION['role'] = $user['role']; // تخزين دور المستخدم (إدمن أو طالب)
-
-        // التوجيه بناءً على الدور
-        if ($user['role'] == 'admin') {
-            header("Location: admin_dashboard.php"); // إذا كان إدمن، توجيهه إلى لوحة تحكم الإدمن
-        } else {
-            header("Location: student_dashboard.php"); // إذا كان طالبًا، توجيهه إلى لوحة تحكم الطالب
-        }
-        exit();
+    // Validation
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = "صيغة البريد الإلكتروني غير صحيحة.";
+    } elseif (strlen($password) < 6) {
+        $error = "كلمة المرور يجب أن تكون على الأقل 6 حروف.";
     } else {
-        echo "البريد الإلكتروني أو كلمة المرور غير صحيحة.";
+        // التحقق من الحساب
+        $stmt = $conn->prepare("SELECT * FROM user WHERE email = ? LIMIT 1");
+        $stmt->execute([$email]);
+        $user = $stmt->fetch();
+
+        if ($user && password_verify($password, $user['password'])) {
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['role'] = $user['role'];
+
+            if ($user['role'] === 'admin') {
+                header("Location: admin_dashboard.php");
+            } else {
+                header("Location: student_dashboard.php");
+            }
+            exit();
+        } else {
+            $error = "البريد أو كلمة المرور غير صحيحة.";
+        }
     }
 }
 ?>
-
-<!-- نموذج تسجيل الدخول -->
-<form method="POST" action="login.php">
-    <label for="email">البريد الإلكتروني:</label>
-    <input type="email" name="email" required><br><br>
-    
-    <label for="password">كلمة المرور:</label>
-    <input type="password" name="password" required><br><br>
-    
-    <input type="submit" value="تسجيل الدخول">
-</form>
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>تسجيل الدخول</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+<div class="form-container">
+    <h2>تسجيل الدخول</h2>
+    <form method="post" action="">
+        <input type="email" name="email" placeholder="البريد الإلكتروني" required>
+        <input type="password" name="password" placeholder="كلمة المرور" required>
+        <button type="submit">دخول</button>
+    </form>
+    <?php if ($error): ?>
+        <p style="color:red;"><?php echo $error; ?></p>
+    <?php endif; ?>
+    <p>ليس لديك حساب؟ <a href="register.php">أنشئ حساب</a></p>
+</div>
+</body>
+</html>
