@@ -12,6 +12,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = clean($_POST['email']);
     $password = $_POST['password'];
     $role = $_POST['role'];
+    $id = $_POST['id'];  // رقم الطالب أو رقم الوظيفة
 
     // Validation
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -26,6 +27,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $errors[] = "يجب اختيار دور صالح.";
     }
 
+    if (empty($id)) {
+        $errors[] = "يجب إدخال رقم الطالب أو رقم الوظيفة.";
+    }
+
     // Check if email exists
     $stmt = $conn->prepare("SELECT * FROM user WHERE email = ?");
     $stmt->execute([$email]);
@@ -36,8 +41,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // إذا لا توجد أخطاء، نسجّل
     if (empty($errors)) {
         $hashed_password = password_hash($password, PASSWORD_BCRYPT);
-        $stmt = $conn->prepare("INSERT INTO user (name, email, password, role) VALUES (?, ?, ?, ?)");
-        if ($stmt->execute([$name, $email, $hashed_password, $role])) {
+        $stmt = $conn->prepare("INSERT INTO user (name, email, password, role, id) VALUES (?, ?, ?, ?, ?)");
+        if ($stmt->execute([$name, $email, $hashed_password, $role, $id])) {
             $message = "تم التسجيل بنجاح! يمكنك تسجيل الدخول الآن.";
         } else {
             $errors[] = "حدث خطأ أثناء التسجيل.";
@@ -56,16 +61,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <div class="form-container">
     <h2>إنشاء حساب</h2>
     <form method="post" action="">
-        <input type="text" name="name" placeholder="الاسم الكامل" required>
-        <input type="email" name="email" placeholder="البريد الإلكتروني" required>
-        <input type="password" name="password" placeholder="كلمة المرور" required>
+        <input type="text" name="name" placeholder="الاسم الكامل" required value="<?php echo isset($name) ? htmlspecialchars($name) : ''; ?>">
+        <input type="email" name="email" placeholder="البريد الإلكتروني" required value="<?php echo isset($email) ? htmlspecialchars($email) : ''; ?>" minlength="5" maxlength="255">
+        <input type="password" name="password" placeholder="كلمة المرور" required minlength="6" maxlength="255">
+        
         <select name="role" required>
             <option value="">اختر الدور</option>
-            <option value="student">طالب</option>
-            <option value="admin">مشرف</option>
+            <option value="student" <?php echo (isset($role) && $role == 'student') ? 'selected' : ''; ?>>طالب</option>
+            <option value="admin" <?php echo (isset($role) && $role == 'admin') ? 'selected' : ''; ?>>مشرف</option>
         </select>
+
+        <input type="text" name="id" placeholder="رقم الطالب أو رقم الوظيفة" value="<?php echo isset($id) ? htmlspecialchars($id) : ''; ?>" required>
+
         <button type="submit">تسجيل</button>
     </form>
+
     <?php
     if (!empty($errors)) {
         echo "<ul style='color:red;'>";
