@@ -313,9 +313,9 @@ $project_count = $stmt->fetchColumn();
             </div>
             <ul class="sidebar-menu">
                 <li class="active"><a href="admin_dashboard.php"><i class="fas fa-home"></i> الصفحة الرئيسية</a></li>
-                <li><a href="manage_users.php"><i class="fas fa-users"></i> إدارة المستخدمين</a></li>
+                
                 <li><a href="manage_projects.php"><i class="fas fa-project-diagram"></i> إدارة المشاريع</a></li>
-                <li><a href="reports.php"><i class="fas fa-chart-line"></i> التقارير</a></li>
+                <li><a href="manage_inactive_users.php"><i class="fas fa-users"></i> إدارة الحسابات غير المفعلّة</a></li>
                 <li><a href="logout.php"><i class="fas fa-sign-out-alt"></i> تسجيل الخروج</a></li>
             </ul>
         </div>
@@ -337,11 +337,7 @@ $project_count = $stmt->fetchColumn();
                 </div>
             </div>
 
-            <div class="management-options">
-                
-            </div>
-        </div>
-    </div>
+            
 
     <!-- إضافة مكتبة Font Awesome للأيقونات -->
     <script src="https://kit.fontawesome.com/a076d05399.js"></script>
