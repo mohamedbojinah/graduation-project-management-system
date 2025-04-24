@@ -2,7 +2,7 @@
 session_start();
 
 // التأكد من أن المستخدم هو "أدمن"
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
+if (!isset($_SESSION['role'])  $_SESSION['role'] !== 'admin') {
     header("Location: login.php");
     exit();
 }
@@ -14,20 +14,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // استلام البيانات المدخلة
     $title = $_POST['title'];
     $description = $_POST['description'];
-    $start_date = $_POST['start_date'];
     $status = $_POST['status'];
+    $student_id = $_POST['student_id'];
+    $manager_id = $_POST['manager_id'];
+
+    // تحديد التاريخ الحالي كـ startDate
+    $startDate = date('Y-m-d H:i:s'); // التاريخ الحالي من الجهاز
+    $endDate = ''; // حقل تاريخ الانتهاء فارغ
 
     // التحقق من وجود الحقول المطلوبة
-    if (empty($title) || empty($start_date) || empty($status) || empty($description)) {
+    if (empty($title)  empty($description)  empty($status)  empty($student_id) || empty($manager_id)) {
         $error_message = "يرجى تعبئة جميع الحقول.";
     } else {
         // استعلام لإضافة مشروع جديد
-        $stmt = $conn->prepare("INSERT INTO project (title, description, start_date, status) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$title, $description, $start_date, $status]);
-
-        // إعادة التوجيه إلى صفحة إدارة المشاريع بعد إضافة المشروع
-        header("Location: manage_projects.php");
-        exit();
+        $stmt = $conn->prepare("INSERT INTO project (title, description, status, startDate, endDate, student_id, manager_id) 
+                               VALUES (?, ?, ?, ?, ?, ?, ?)");
+        if ($stmt->execute([$title, $description, $status, $startDate, $endDate, $student_id, $manager_id])) {
+            // إعادة التوجيه إلى صفحة إدارة المشاريع بعد إضافة المشروع
+            header("Location: manage_projects.php");
+            exit();
+        } else {
+            $error_message = "حدث خطأ أثناء إضافة المشروع.";
+        }
     }
 }
 ?>
@@ -38,7 +46,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>إضافة مشروع</title>
-    <link rel="stylesheet" href="../assets/css/style.css">
     <style>
         body {
             font-family: 'Tajawal', sans-serif;
@@ -141,8 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         .btn-primary:hover {
             background-color: #3498db;
         }
-
-        .error-message {
+.error-message {
             color: #e74c3c;
             font-size: 1rem;
             text-align: center;
@@ -190,17 +196,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 </div>
 
                 <div class="form-group">
-                    <label for="start_date">تاريخ البدء:</label>
-                    <input type="date" name="start_date" id="start_date" class="form-control" value="<?php echo isset($start_date) ? htmlspecialchars($start_date) : ''; ?>" required>
-                </div>
-
-                <div class="form-group">
                     <label for="status">حالة المشروع:</label>
                     <select name="status" id="status" class="form-control" required>
                         <option value="نشط" <?php echo isset($status) && $status == 'نشط' ? 'selected' : ''; ?>>نشط</option>
                         <option value="مكتمل" <?php echo isset($status) && $status == 'مكتمل' ? 'selected' : ''; ?>>مكتمل</option>
                         <option value="ملغى" <?php echo isset($status) && $status == 'ملغى' ? 'selected' : ''; ?>>ملغى</option>
                     </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="student_id">رقم الطالب:</label>
+                    <input type="text" name="student_id" id="student_id" class="form-control" value="<?php echo isset($student_id) ? htmlspecialchars($student_id) : ''; ?>" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="manager_id">رقم المشرف:</label>
+                    <input type="text" name="manager_id" id="manager_id" class="form-control" value="<?php echo isset($manager_id) ? htmlspecialchars($manager_id) : ''; ?>" required>
                 </div>
 
                 <button type="submit" class="btn-primary">إضافة المشروع</button>
