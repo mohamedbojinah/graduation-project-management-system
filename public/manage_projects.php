@@ -9,9 +9,26 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
 
 include '../config/db.php';
 
-// استعلام لعرض قائمة المشاريع
-$stmt = $conn->prepare("SELECT * FROM project");
-$stmt->execute();
+// التحقق من وجود كلمة البحث في الـ GET
+$search_query = "";
+if (isset($_GET['search']) && !empty($_GET['search'])) {
+    $search_query = $_GET['search'];
+}
+
+// استعلام لعرض قائمة المشاريع مع دعم البحث عن طريق اسم المشروع أو اسم الطالب
+if ($search_query) {
+    $stmt = $conn->prepare("
+        SELECT p.*, s.name as student_name
+        FROM project p
+        LEFT JOIN student s ON p.id = s.project_id
+        WHERE p.title LIKE ? OR s.name LIKE ?
+    ");
+    $stmt->execute(['%' . $search_query . '%', '%' . $search_query . '%']);
+} else {
+    $stmt = $conn->prepare("SELECT * FROM project");
+    $stmt->execute();
+}
+
 $projects = $stmt->fetchAll();
 ?>
 
@@ -25,7 +42,7 @@ $projects = $stmt->fetchAll();
     <style>
         body {
             font-family: 'Tajawal', sans-serif;
-            background-color: #f5f5f5;
+            background-color:rgb(255, 255, 255);
             color: #333;
             direction: rtl;
             font-size: 16px;
@@ -41,11 +58,11 @@ $projects = $stmt->fetchAll();
 
         /* الشريط الجانبي */
         .sidebar {
-            background-color:rgb(27, 112, 197);
-            width: 250px;
+            background-color: #34495e;
+            width: 300px;
             min-height: 100vh;
             border-radius: 0 20px 20px 0;
-            box-shadow: 2px 0 15px rgba(0, 0, 0, 0.1);
+            box-shadow: 2px 0 15px rgba(172, 175, 5, 0.1);
             padding: 20px;
         }
 
@@ -84,7 +101,7 @@ $projects = $stmt->fetchAll();
             background-color: white;
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            margin-left: 250px;
+            margin-left: 300px;
         }
 
         .page-header {
@@ -96,6 +113,24 @@ $projects = $stmt->fetchAll();
             color: #2c3e50;
         }
 
+        .search-bar {
+            margin-bottom: 20px;
+            text-align: right;
+        }
+
+        .search-bar input {
+            width: 300px;
+            padding: 10px;
+            font-size: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            transition: border-color 0.3s;
+        }
+
+        .search-bar input:focus {
+            border-color: #2980b9;
+        }
+
         /* جدول المشاريع */
         .projects-table-container {
             margin-top: 30px;
@@ -104,7 +139,7 @@ $projects = $stmt->fetchAll();
         .projects-table {
             width: 100%;
             border-collapse: collapse;
-            background-color:rgb(116, 160, 172);
+            background-color:rgb(113, 119, 119);
             border-radius: 10px;
             overflow: hidden;
         }
@@ -121,7 +156,7 @@ $projects = $stmt->fetchAll();
         }
 
         .projects-table tr:hover {
-            background-color:rgb(231, 235, 31);
+            background-color:rgb(87, 146, 255);
         }
 
         .projects-table .actions a {
@@ -133,19 +168,19 @@ $projects = $stmt->fetchAll();
         }
 
         .projects-table .actions .btn-edit {
-            background-color: #f39c12;
+            background-color: #3498db; /* الأزرق الفاتح */
         }
 
         .projects-table .actions .btn-edit:hover {
-            background-color: #e67e22;
+            background-color: #2980b9; /* الأزرق الداكن عند المرور */
         }
 
         .projects-table .actions .btn-delete {
-            background-color: #e74c3c;
+            background-color: #3498db; /* الأزرق الفاتح */
         }
 
         .projects-table .actions .btn-delete:hover {
-            background-color: #c0392b;
+            background-color: #2980b9; /* الأزرق الداكن عند المرور */
         }
 
         .back-btn {
@@ -164,10 +199,20 @@ $projects = $stmt->fetchAll();
             background-color: #2980b9;
         }
 
-        /* تنسيق الجداول */
-        .projects-table td {
-            word-wrap: break-word;
-            max-width: 200px;
+        .add-project-btn {
+            background-color: #27ae60;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 1.2rem;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        .add-project-btn:hover {
+            background-color: #2ecc71;
         }
 
     </style>
@@ -182,9 +227,9 @@ $projects = $stmt->fetchAll();
             </div>
             <ul class="sidebar-menu">
                 <li><a href="admin_dashboard.php"><i class="fas fa-home"></i> الصفحة الرئيسية</a></li>
-                <li><a href="manage_users.php"><i class="fas fa-users"></i> إدارة المستخدمين</a></li>
+                
                 <li class="active"><a href="manage_projects.php"><i class="fas fa-project-diagram"></i> إدارة المشاريع</a></li>
-                <li><a href="reports.php"><i class="fas fa-chart-line"></i> التقارير</a></li>
+                
                 <li><a href="logout.php"><i class="fas fa-sign-out-alt"></i> تسجيل الخروج</a></li>
             </ul>
         </div>
@@ -193,7 +238,15 @@ $projects = $stmt->fetchAll();
         <div class="main-content">
             <div class="page-header">
                 <h2>إدارة المشاريع</h2>
-                <a href="add_project.php" class="btn btn-primary"><i class="fas fa-plus"></i> إضافة مشروع</a>
+                <a href="add_project.php" class="add-project-btn"><i class="fas fa-plus"></i> إضافة مشروع</a>
+            </div>
+
+            <!-- مربع البحث -->
+            <div class="search-bar">
+                <form method="GET" action="manage_projects.php">
+                    <input type="text" name="search" placeholder="ابحث عن مشروع أو طالب..." value="<?php echo htmlspecialchars($search_query); ?>">
+                    <button type="submit" class="btn btn-primary">بحث</button>
+                </form>
             </div>
 
             <!-- عرض المشاريع -->
@@ -212,11 +265,11 @@ $projects = $stmt->fetchAll();
                         <?php foreach ($projects as $project): ?>
                             <tr>
                                 <td><?php echo htmlspecialchars($project['title']); ?></td>
-                                <td><?php echo htmlspecialchars($project['start_date']); ?></td>
+                                <td><?php echo htmlspecialchars($project['startDate']); ?></td>
                                 <td>
                                     <?php
                                     // التحقق من وجود تاريخ الانتهاء
-                                    echo isset($project['end_date']) ? htmlspecialchars($project['end_date']) : 'غير محدد';
+                                    echo isset($project['endDate']) ? htmlspecialchars($project['endDate']) : 'غير محدد';
                                     ?>
                                 </td>
                                 <td class="status <?php echo strtolower($project['status']); ?>">
