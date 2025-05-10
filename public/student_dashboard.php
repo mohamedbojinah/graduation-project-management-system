@@ -1,63 +1,177 @@
 <?php
 session_start();
-require_once '../config/config.php';  // الرجوع للمجلد الأعلى ثم إلى config/config.php
+include '../config/db.php';
 
-// التحقق من أن المستخدم هو الطالب
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'student') {
+// التحقق من تسجيل الدخول
+if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit();
 }
 
-$user_id = $_SESSION['user_id'];
+// استرجاع معرف المستخدم (الطالب)
+$user_id = $_SESSION['user_id']; // تأكد من أن هذا هو المعرف الصحيح للمستخدم
 
-// استعلام للحصول على مشاريع الطالب
-$stmt = $conn->prepare("SELECT * FROM Project WHERE student_id = ?");
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
-$projects = $stmt->get_result();
-
-// استعلام للحصول على المهام الخاصة بالطالب
-$stmt2 = $conn->prepare("SELECT * FROM Task WHERE assignedTo = ?");
-$stmt2->bind_param("i", $user_id);
-$stmt2->execute();
-$tasks = $stmt2->get_result();
+// استرجاع المشاريع الخاصة بالطالب مع التقييمات
+$stmt = $conn->prepare("
+    SELECT project.*, evaluations.evaluation_score
+    FROM project
+    LEFT JOIN evaluations ON project.id = evaluations.project_id
+    WHERE project.student_id = ?
+");
+$stmt->execute([$user_id]);
+$projects = $stmt->fetchAll();
 ?>
 
 <!DOCTYPE html>
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>لوحة تحكم الطالب</title>
     <link rel="stylesheet" href="../assets/css/style.css">
+    <style>
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            direction: rtl;
+            font-size: 16px;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            width: 80%;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            margin-right: 270px; /* لتجنب تداخل المحتوى مع الشريط الجانبي */
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+            color: #2980b9;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: center;
+            border: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #2980b9;
+            color: white;
+        }
+
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        .back-btn {
+            display: block;
+            width: 150px;
+            margin: 20px auto;
+            padding: 10px;
+            background-color: #2980b9;
+            color: white;
+            text-align: center;
+            border-radius: 5px;
+            text-decoration: none;
+        }
+
+        .back-btn:hover {
+            background-color: #3498db;
+        }
+
+        /* الشريط الجانبي */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            right: 0; /* وضع الشريط الجانبي على اليمين */
+            background-color: #34495e;
+            width: 250px;
+            height: 100%;
+            color: white;
+            box-shadow: -3px 0 10px rgba(0, 0, 0, 0.1);
+            padding-top: 30px;
+        }
+
+        .sidebar a {
+            display: block;
+            padding: 15px 20px;
+            text-decoration: none;
+            color: white;
+            font-size: 1.2rem;
+            transition: background-color 0.3s ease;
+        }
+
+        .sidebar a:hover {
+            background-color: #2980b9;
+        }
+
+        .sidebar a.active {
+            background-color: #2980b9;
+        }
+
+        .sidebar .back-btn {
+            margin-top: 20px;
+            background-color: #e74c3c;
+        }
+
+    </style>
 </head>
 <body>
-    <h2>لوحة تحكم الطالب</h2>
-    <nav>
-        <ul>
-            <li><a href="profile.php">الملف الشخصي</a></li>
-            <li><a href="tasks.php">المهام</a></li>
-            <li><a href="projects.php">المشاريع</a></li>
-            <li><a href="reports.php">التقارير</a></li>
-        </ul>
-    </nav>
 
-    <h3>مشاريعك:</h3>
-    <ul>
-        <?php while ($project = $projects->fetch_assoc()): ?>
-            <li><?= $project['title'] ?> - <?= $project['status'] ?></li>
-        <?php endwhile; ?>
-    </ul>
+<!-- الشريط الجانبي -->
+<div class="sidebar">
+    <a href="student_dashboard.php">الصفحة الرئيسية</a>
+    <a href="completed_projects_student.php" class="active">مشاريع مكتملة</a>
+    <a href="logout.php">تسجيل الخروج</a>
+</div>
 
-    <h3>مهامك:</h3>
-    <ul>
-        <?php while ($task = $tasks->fetch_assoc()): ?>
-            <li><?= $task['description'] ?> - <?= $task['status'] ?> (الموعد النهائي: <?= $task['dueDate'] ?>)</li>
-        <?php endwhile; ?>
-    </ul>
+<!-- المحتوى الرئيسي -->
+<div class="container">
+    <h2>مشاريعك</h2>
 
-    <footer>
-        <p>&copy; 2025 لوحة تحكم الطالب</p>
-    </footer>
+    <?php if (count($projects) > 0): ?>
+        <table>
+            <thead>
+                <tr>
+                    <th>عنوان المشروع</th>
+                    <th>الوصف</th>
+                    <th>تاريخ البدء</th>
+                    <th>تاريخ الانتهاء</th>
+                    <th>الحالة</th>
+                    <th>التقييم</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($projects as $project): ?>
+                    <tr>
+                        <td><?php echo htmlspecialchars($project['title'] ?? 'غير محدد'); ?></td>
+                        <td><?php echo htmlspecialchars($project['description'] ?? 'غير محدد'); ?></td>
+                        <td><?php echo htmlspecialchars($project['start_date'] ?? 'غير محدد'); ?></td>
+                        <td><?php echo htmlspecialchars($project['end_date'] ?? 'غير محدد'); ?></td>
+                        <td><?php echo htmlspecialchars($project['status'] ?? 'غير محدد'); ?></td>
+                        <td><?php echo ($project['evaluation_score'] !== null) ? htmlspecialchars($project['evaluation_score']) : 'لم يتم التقييم بعد'; ?></td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    <?php else: ?>
+        <p>لا توجد مشاريع مخصصة لك حالياً.</p>
+    <?php endif; ?>
+
+</div>
+
 </body>
 </html>
