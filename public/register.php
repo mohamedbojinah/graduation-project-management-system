@@ -12,7 +12,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = clean($_POST['email']);
     $password = $_POST['password'];
     $role = $_POST['role'];
-    $id = $_POST['id'];  // رقم الطالب أو رقم الوظيفة
+    $id = $_POST['id'];  // رقم الطالب أو رقم الدكتور
 
     // Validation
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -23,7 +23,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $errors[] = "كلمة المرور يجب أن تكون 6 حروف أو أكثر.";
     }
 
-    if ($role !== 'student' && $role !== 'admin') {
+    if ($role !== 'student' &&  $role != 'doctor') {
         $errors[] = "يجب اختيار دور صالح.";
     }
 
@@ -41,8 +41,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // إذا لا توجد أخطاء، نسجّل
     if (empty($errors)) {
         $hashed_password = password_hash($password, PASSWORD_BCRYPT);
-        $stmt = $conn->prepare("INSERT INTO user (name, email, password, role, id) VALUES (?, ?, ?, ?, ?)");
-        if ($stmt->execute([$name, $email, $hashed_password, $role, $id])) {
+        $stmt = $conn->prepare("INSERT INTO user (name, email, password, role, id, state) VALUES (?, ?, ?, ?, ?, ?)");
+        if ($stmt->execute([$name, $email, $hashed_password, $role, $id, 0])) {
             $message = "تم التسجيل بنجاح! يمكنك تسجيل الدخول الآن.";
         } else {
             $errors[] = "حدث خطأ أثناء التسجيل.";
@@ -50,6 +50,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="ar">
 <head>
@@ -68,10 +69,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <select name="role" required>
             <option value="">اختر الدور</option>
             <option value="student" <?php echo (isset($role) && $role == 'student') ? 'selected' : ''; ?>>طالب</option>
-            <option value="admin" <?php echo (isset($role) && $role == 'admin') ? 'selected' : ''; ?>>مشرف</option>
+            <option value="doctor" <?php echo (isset($role) && $role == 'doctor') ? 'selected' : ''; ?>>دكتور</option>
+           
         </select>
 
-        <input type="text" name="id" placeholder="رقم الطالب أو رقم الوظيفة" value="<?php echo isset($id) ? htmlspecialchars($id) : ''; ?>" required>
+        <input type="text" name="id" placeholder="ادخل رقم المستخدم" value="<?php echo isset($id) ? htmlspecialchars($id) : ''; ?>" required>
 
         <button type="submit">تسجيل</button>
     </form>
@@ -85,7 +87,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         echo "</ul>";
     } elseif ($message) {
         echo "<p style='color:green;'>$message</p>";
-        // زر الرجوع
         echo "<p><a href='login.php'><button>رجوع إلى صفحة تسجيل الدخول</button></a></p>";
     }
     ?>
