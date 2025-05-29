@@ -1,16 +1,14 @@
 <?php
 session_start();
 
-// التحقق من صلاحية المستخدم (هل هو دكتور؟)
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'doctor') {
     header("Location: index.php");
     exit();
 }
 
-// الاتصال بقاعدة البيانات
 $host = '127.0.0.1';
 $port = '3307';
-$dbname = 'project_db';  // اسم قاعدة البيانات الصحيحة
+$dbname = 'project_db';
 $username = 'root';
 $password = '';
 
@@ -19,23 +17,72 @@ try {
     $conn = new PDO($dsn, $username, $password);
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // جلب بيانات الدكتور من قاعدة البيانات باستخدام id
-    $doctor_id = $_SESSION['user_id']; // الحصول على معرّف الدكتور من الجلسة
-    $query = "SELECT * FROM user WHERE id = :doctor_id"; // استخدام id بدلاً من user_id
+    $doctor_id = $_SESSION['user_id'];
+    $query = "SELECT * FROM user WHERE id = :doctor_id";
     $stmt = $conn->prepare($query);
     $stmt->bindParam(':doctor_id', $doctor_id);
     $stmt->execute();
     $doctor = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$doctor) {
-        // إذا لم يتم العثور على بيانات الدكتور، التوجيه إلى صفحة تسجيل الخروج
         header("Location: logout.php");
         exit();
+    }
+
+    // جلب المشاريع التي يشرف عليها الدكتور
+    $project_stmt = $conn->prepare("SELECT * FROM project WHERE manager_id = ?");
+    $project_stmt->execute([$doctor_id]);
+    $projects = $project_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // إعداد قائمة الطلبة المرتبطين بالمشاريع
+    $student_ids = [];
+    foreach ($projects as $project) {
+        if (!empty($project['student_id'])) $student_ids[] = $project['student_id'];
+        if (!empty($project['student_id_2'])) $student_ids[] = $project['student_id_2'];
+    }
+    $student_ids = array_unique($student_ids);
+
+    $students = [];
+    if (count($student_ids)) {
+        $placeholders = implode(',', array_fill(0, count($student_ids), '?'));
+        $stmt = $conn->prepare("SELECT id, name FROM user WHERE id IN ($placeholders)");
+        $stmt->execute($student_ids);
+        $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // إرسال الرسالة
+    if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['message'])) {
+        $message = trim($_POST['message']);
+        $receivers = $_POST['receivers'] ?? [];
+
+        foreach ($receivers as $receiver_id) {
+            $stmt = $conn->prepare("INSERT INTO messages (sender_id, receiver_id, message, sent_at) VALUES (?, ?, ?, NOW())");
+            $stmt->execute([$doctor_id, $receiver_id, $message]);
+        }
+
+        $success = "تم إرسال الرسالة بنجاح.";
     }
 
 } catch (PDOException $e) {
     echo "فشل الاتصال: " . $e->getMessage();
     exit();
+}
+
+function getStatusClass($status) {
+    switch (strtolower($status)) {
+        case 'معلق':
+        case 'pending':
+            return 'status-pending';
+        case 'مكتمل':
+        case 'completed':
+            return 'status-success';
+        case 'نشط':
+        case 'قيد التنفيذ':
+        case 'active':
+            return 'status-active';
+        default:
+            return 'status-default';
+    }
 }
 ?>
 
@@ -80,7 +127,6 @@ try {
             background-color: var(--secondary-color);
             width: 280px;
             min-height: 100vh;
-            transition: all 0.3s;
             border-radius: 0 20px 20px 0;
             box-shadow: 2px 0 15px rgba(0, 0, 0, 0.1);
         }
@@ -116,12 +162,6 @@ try {
         .sidebar-menu li a:hover {
             background-color: rgba(255, 255, 255, 0.1);
             border-right-color: var(--active-color);
-        }
-
-        .sidebar-menu li.active a {
-            background-color: rgba(0, 0, 0, 0.2);
-            border-right-color: var(--active-color);
-            font-weight: 500;
         }
 
         .main-content {
@@ -164,11 +204,6 @@ try {
         .tasks-table th {
             background-color: var(--primary-color);
             color: white;
-            font-weight: 500;
-        }
-
-        .tasks-table tr:hover {
-            background-color: #f9f9f9;
         }
 
         .status {
@@ -189,153 +224,161 @@ try {
             color: #856404;
         }
 
-        .btn {
-            padding: 0.6rem 1.2rem;
-            border-radius: 5px;
-            border: none;
-            cursor: pointer;
-            font-family: 'Tajawal', sans-serif;
-            font-size: 1rem;
-            transition: all 0.3s;
-            display: inline-flex;
+        .status-success {
+            background-color: #cce5ff;
+            color: #004085;
+        }
+
+        .status-default {
+            background-color: #eeeeee;
+            color: #333;
+        }
+
+        .message-success {
+            color: green;
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        .chat-popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 999;
+            background-color: white;
+            padding: 20px;
+            width: 350px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        }
+
+        .form-container h3 {
+            margin-top: 0;
+            color: #2980b9;
+            text-align: center;
+        }
+
+        .receiver-option {
+            display: flex;
             align-items: center;
-            justify-content: center;
+            margin-bottom: 10px;
+            gap: 10px;
         }
 
-        .btn-primary {
-            background-color: var(--active-color);
-            color: white;
+        textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            resize: none;
         }
 
-        .btn-primary:hover {
-            background-color: #3498db;
-        }
-
-        .btn-danger {
-            background-color: var(--danger-color);
-            color: white;
-        }
-
-        .btn-danger:hover {
-            background-color: #c0392b;
+        .btn {
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 48%;
         }
 
         .btn-success {
-            background-color: var(--success-color);
+            background-color: #27ae60;
             color: white;
         }
 
-        .btn-success:hover {
-            background-color: #219955;
-        }
-
-        @media (max-width: 992px) {
-            .tasks-table {
-                display: block;
-                overflow-x: auto;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .admin-container {
-                flex-direction: column;
-            }
-
-            .sidebar {
-                width: 100%;
-                min-height: auto;
-            }
-
-            .sidebar-menu {
-                display: flex;
-                flex-wrap: wrap;
-            }
-
-            .sidebar-menu li {
-                flex: 1 0 auto;
-            }
-
-            .sidebar-menu li a {
-                justify-content: center;
-                border-right: none;
-                border-bottom: 3px solid transparent;
-            }
-
-            .sidebar-menu li a:hover {
-                border-right: none;
-                border-bottom-color: var(--active-color);
-            }
-
-            .sidebar-menu li.active a {
-                border-right: none;
-                border-bottom-color: var(--active-color);
-            }
-
-            .tasks-table .actions {
-                flex-direction: column;
-                gap: 5px;
-            }
+        .btn-cancel {
+            background-color: #e74c3c;
+            color: white;
         }
     </style>
 </head>
 <body>
-    <div class="admin-container">
-        <div class="sidebar">
-            <div class="sidebar-header">
-                <h2>لوحة تحكم الدكتور</h2>
-            </div>
-            <ul class="sidebar-menu">
-                <li><a href="doctor_dashboard.php">الصفحة الرئيسية</a></li>
-                <li><a href="doctor_tasks.php">إدارة المهام</a></li>
-                <li><a href="evaluation.php"> التقييمات</a></li>
-                <li><a href="doctor_profile.php">الملف الشخصي</a></li>
-                <li><a href="logout.php" class="btn btn-danger">تسجيل الخروج</a></li>
-            </ul>
+<div class="admin-container">
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>لوحة تحكم الدكتور</h2>
+        </div>
+        <!-- ضمن القائمة الجانبية بعد "إرسال رسالة" -->
+<ul class="sidebar-menu">
+    <li><a href="doctor_dashboard.php">الصفحة الرئيسية</a></li>
+    <li><a href="doctor_tasks.php">إدارة المهام</a></li>
+    <li><a href="#" id="toggleMessageForm">📩 إرسال رسالة</a></li>
+    <li><a href="messages_log.php">📨 سجل الرسائل</a></li> <!-- تمت إضافته هنا -->
+    <li><a href="evaluation.php"> التقييمات</a></li>
+    <li><a href="doctor_profile.php">الملف الشخصي</a></li>
+    <li><a href="logout.php" class="btn btn-danger">تسجيل الخروج</a></li>
+</ul>
+
+    </div>
+
+    <div class="main-content">
+        <div class="page-header">
+            <h2>مرحبًا، دكتور <?= $doctor['name']; ?>!</h2>
         </div>
 
-        <div class="main-content">
-            <div class="page-header">
-                <h2>مرحبًا، دكتور <?php echo $doctor['name']; ?>!</h2>
-            </div>
+        <?php if (isset($success)) echo "<p class='message-success'>$success</p>"; ?>
 
-            <div class="doctor-info">
-                <h3>الملف الشخصي</h3>
-                <p><strong>البريد الإلكتروني:</strong> <?php echo $doctor['email']; ?></p>
-            
-                <p><strong>المشاريع المكلف بها:</strong> 3 مشاريع</p>
-            </div>
-
-            <div class="doctor-tasks">
-                <h3>المهام المكلف بها</h3>
+        <div class="doctor-info">
+            <h3>المشاريع التي تُشرف عليها</h3>
+            <?php if (count($projects) === 0): ?>
+                <p>لا توجد مشاريع حالياً.</p>
+            <?php else: ?>
                 <table class="tasks-table">
                     <thead>
                         <tr>
-                            <th>المهمة</th>
-                            <th>المشروع</th>
-                            <th>تاريخ الاستحقاق</th>
+                            <th>عنوان المشروع</th>
+                            <th>الوصف</th>
+                            <th>تاريخ البدء</th>
+                            <th>تاريخ الانتهاء</th>
                             <th>الحالة</th>
-                            <th>الإجراءات</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
-                            <td>كتابة تقرير البحث</td>
-                            <td>مشروع تطوير الموقع</td>
-                            <td>2025-05-10</td>
-                            <td><span class="status status-active">قيد التنفيذ</span></td>
-                            <td><a href="edit_task.php?task_id=1" class="btn btn-primary">تعديل</a></td>
-                        </tr>
-                        <tr>
-                            <td>مراجعة التعليمات البرمجية</td>
-                            <td>مشروع تحليل البيانات</td>
-                            <td>2025-05-15</td>
-                            <td><span class="status status-pending">معلق</span></td>
-                            <td><a href="edit_task.php?task_id=2" class="btn btn-primary">تعديل</a></td>
-                        </tr>
+                        <?php foreach ($projects as $project): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($project['title']) ?></td>
+                                <td><?= htmlspecialchars($project['description']) ?></td>
+                                <td><?= htmlspecialchars($project['startDate']) ?></td>
+                                <td><?= htmlspecialchars($project['endDate']) ?></td>
+                                <td><span class="status <?= getStatusClass($project['status']) ?>"><?= htmlspecialchars($project['status']) ?></span></td>
+                            </tr>
+                        <?php endforeach; ?>
                     </tbody>
                 </table>
-            </div>
+            <?php endif; ?>
         </div>
     </div>
+</div>
+
+<!-- نموذج إرسال رسالة -->
+<div class="chat-popup" id="messageForm">
+    <form method="POST" class="form-container">
+        <h3>إرسال رسالة للطلاب</h3>
+        <?php foreach ($students as $student): ?>
+            <div class="receiver-option">
+                <input type="checkbox" name="receivers[]" value="<?= $student['id'] ?>">
+                <span><?= htmlspecialchars($student['name']) ?></span>
+            </div>
+        <?php endforeach; ?>
+        <textarea name="message" placeholder="اكتب رسالتك هنا..." rows="4" required></textarea>
+        <div style="display: flex; justify-content: space-between;">
+            <button type="submit" class="btn btn-success">إرسال</button>
+            <button type="button" class="btn btn-cancel" id="closeForm">إغلاق</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    document.getElementById("toggleMessageForm").addEventListener("click", function(e) {
+        e.preventDefault();
+        document.getElementById("messageForm").style.display = "block";
+    });
+    document.getElementById("closeForm").addEventListener("click", function() {
+        document.getElementById("messageForm").style.display = "none";
+    });
+</script>
 </body>
 </html>
